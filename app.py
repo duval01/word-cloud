@@ -12,7 +12,7 @@ import time
 from sklearn.feature_extraction.text import CountVectorizer
 
 # --- CONFIGURAÇÕES ---
-NOME_PLANILHA = "Formulário sem título (respostas)"
+NOME_PLANILHA = "Respostas Conecta Sede"
 
 # LISTA com os nomes exatos das 3 colunas (Cabeçalhos)
 COLUNAS_PERGUNTAS = [

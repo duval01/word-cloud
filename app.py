@@ -8,7 +8,7 @@ import matplotlib.patches as mpatches
 from matplotlib.colors import LinearSegmentedColormap
 import time
 
-# --- NOVO IMPORT NECESSÁRIO PARA A LÓGICA DE BIGRAMAS ---
+# --- IMPORT NECESSÁRIO PARA A LÓGICA DE BIGRAMAS ---
 from sklearn.feature_extraction.text import CountVectorizer
 
 # --- CONFIGURAÇÕES ---
@@ -99,31 +99,48 @@ def buscar_dados():
         st.warning("Conectando à planilha...") 
         return pd.DataFrame()
 
-# --- NOVA LÓGICA: GERAR DICIONÁRIO DE FREQUÊNCIA ---
+# --- NOVA LÓGICA INTELIGENTE (COM SUBTRAÇÃO) ---
 def calcular_frequencias(lista_textos):
     """
-    Recebe uma lista de frases e retorna um dicionário {palavra: contagem},
-    considerando unigramas e bigramas (ex: 'novos aprendizados').
+    1. Conta unigramas e bigrams.
+    2. Se um bigrama (ex: 'novos aprendizados') existe, subtrai a contagem dele
+       das palavras individuais ('novos' e 'aprendizados').
+    3. Remove palavras que ficaram com contagem <= 0 (ou seja, só existiam dentro da frase).
     """
-    # ngram_range=(1, 2) -> Pega palavras sozinhas E pares de palavras
     cv = CountVectorizer(ngram_range=(1, 2), stop_words=list(stopwords_pt))
     
     try:
-        # Cria a matriz de contagem (Fit e Transform)
+        # Cria a matriz
         X = cv.fit_transform(lista_textos)
-        
-        # Soma as colunas da matriz (total de vezes que cada termo apareceu)
         sum_words = X.sum(axis=0) 
         
-        # Cria lista de tuplas [(palavra, freq), ...]
-        words_freq = [(word, sum_words[0, idx]) for word, idx in cv.vocabulary_.items()]
+        # 1. Cria dicionário inicial com TUDO misturado (Palavras soltas e Frases)
+        freqs_geral = {word: sum_words[0, idx] for word, idx in cv.vocabulary_.items()}
         
-        # Ordena e transforma em dicionário
-        words_freq = sorted(words_freq, key = lambda x: x[1], reverse=True)
-        return dict(words_freq)
+        # 2. Separa em dois dicionários: Frases (Bigramas) e Palavras Soltas (Unigramas)
+        bigramas = {k: v for k, v in freqs_geral.items() if " " in k}
+        unigramas = {k: v for k, v in freqs_geral.items() if " " not in k}
+        
+        # 3. A Lógica de Subtração
+        for frase, count in bigramas.items():
+            palavras = frase.split(" ") # Quebra "novos aprendizados" em ["novos", "aprendizados"]
+            
+            for p in palavras:
+                # Se a palavra individual existe nos unigramas, subtrai a contagem da frase
+                if p in unigramas:
+                    unigramas[p] -= count
+        
+        # 4. Reconstrói o dicionário final, removendo quem zerou (ou ficou negativo)
+        dicionario_final = bigramas.copy() # Começa adicionando as frases (que são prioritárias)
+        
+        for palavra, count in unigramas.items():
+            if count > 0: # Só adiciona a palavra solta se ela "sobrou" depois da subtração
+                dicionario_final[palavra] = count
+                
+        return dicionario_final
     
     except ValueError:
-        # Acontece se o vocabulário ficar vazio (só tem stopwords)
+        # Retorna vazio se der erro (ex: só tem stopwords)
         return {}
 
 def gerar_figura_nuvem_com_borda(frequencias_dict, cor_mapa, cor_borda):
@@ -138,10 +155,10 @@ def gerar_figura_nuvem_com_borda(frequencias_dict, cor_mapa, cor_borda):
         colormap=cor_mapa,        
         min_font_size=12,
         max_words=50,             
-        # stopwords não precisa aqui, pois já limpamos no CountVectorizer, mas mal não faz
+        # stopwords não precisa aqui, pois já limpamos no CountVectorizer
         random_state=42,          
-        collocations=False        # Importante: False porque nós já calculamos as collocations (bigramas) manualmente
-    ).generate_from_frequencies(frequencias_dict) # <--- MUDANÇA CRUCIAL AQUI
+        collocations=False        # False, pois já calculamos as frases manualmente
+    ).generate_from_frequencies(frequencias_dict) 
 
     # 2. Configura a figura do Matplotlib
     fig, ax = plt.subplots(figsize=(8, 6), facecolor='none')
@@ -181,17 +198,17 @@ while True:
                         st.subheader(TITULOS_VISUAIS[i])
 
                         if nome_coluna_sheet in df.columns:
-                            # Pega a lista de textos crua (sem dar join ainda)
+                            # Pega a lista de textos crua
                             textos_lista = df[nome_coluna_sheet].dropna().astype(str).tolist()
                             
                             # Verifica se tem conteúdo
                             if len(textos_lista) > 0:
                                 try:
-                                    # 1. CALCULA FREQUÊNCIAS (COM BIGRAMAS)
+                                    # 1. CALCULA FREQUÊNCIAS (COM A NOVA LÓGICA DE SUBTRAÇÃO)
                                     freq_dict = calcular_frequencias(textos_lista)
                                     
                                     if freq_dict:
-                                        # 2. GERA NUVEM COM BASE NO DICIONÁRIO
+                                        # 2. GERA NUVEM COM BASE NO DICIONÁRIO LIMPO
                                         fig = gerar_figura_nuvem_com_borda(
                                             freq_dict,
                                             NOVAS_CORES[i], 

@@ -7,22 +7,20 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.colors import LinearSegmentedColormap
 import time
-import unicodedata # <--- NOVO IMPORT PARA LIDAR COM ACENTOS
-
-# --- IMPORT NECESSÁRIO PARA A LÓGICA DE BIGRAMAS ---
+import unicodedata 
 from sklearn.feature_extraction.text import CountVectorizer
 
 # --- CONFIGURAÇÕES ---
 NOME_PLANILHA = "Respostas Conecta Sede"
+NOME_ARQUIVO_LOGO = "VERSÃO VERTICAL Colorida negativa (2).png" # <--- CERTIFIQUE-SE QUE ESSE ARQUIVO ESTÁ NO GITHUB
 
-# LISTA com os nomes exatos das 3 colunas (Cabeçalhos)
+# LISTA com os nomes exatos das 3 colunas
 COLUNAS_PERGUNTAS = [
-    "De quais projetos/resultados da minha equipe tenho orgulho?",   # Coluna 1
-    "O quê de bom aconteceu na Sede/Desenvolvimento Econômico que eu me orgulho?",       # Coluna 2
-    "Do quê eu me orgulho em mim como profissional em 2025?"          # Coluna 3
+    "De quais projetos/resultados da minha equipe tenho orgulho?",
+    "O quê de bom aconteceu na Sede/Desenvolvimento Econômico que eu me orgulho?",
+    "Do quê eu me orgulho em mim como profissional em 2025?"
 ]
 
-# Títulos curtos para aparecer em cima de cada nuvem (Opcional)
 TITULOS_VISUAIS = [
     "Projetos do time",
     "Sucessos da Sede",
@@ -33,20 +31,12 @@ TEMPO_REFRESH = 10
 
 # --- FUNÇÃO HELPER PARA REMOVER ACENTOS ---
 def remover_acentos(texto):
-    """
-    Transforma 'Relatório' em 'Relatorio', 'Ações' em 'Acoes', etc.
-    Isso garante que palavras com e sem acento sejam contadas juntas.
-    """
     if not isinstance(texto, str):
         return str(texto)
-    
-    # Normaliza para decompor caracteres (ex: 'á' vira 'a' + '´')
     nfkd_form = unicodedata.normalize('NFKD', texto)
-    # Filtra apenas os caracteres que não são marcas de acentuação
-    texto_sem_acento = "".join([c for c in nfkd_form if not unicodedata.category(c) == 'Mn'])
-    return texto_sem_acento.lower()
+    return "".join([c for c in nfkd_form if not unicodedata.category(c) == 'Mn']).lower()
 
-# --- CONFIGURAÇÃO DE STOPWORDS (CONECTIVOS A IGNORAR) ---
+# --- CONFIGURAÇÃO DE STOPWORDS ---
 stopwords_pt = set(STOPWORDS)
 lista_extra = [
     "de", "a", "o", "que", "e", "do", "da", "em", "um", "para", "é", "com", "não", "uma", "os", "no", 
@@ -59,9 +49,6 @@ lista_extra = [
     "teu", "tua", "teus", "tuas", "nosso", "nossa", "nossos", "nossas", "ok", "foi"
 ]
 stopwords_pt.update(lista_extra)
-
-# IMPORTANTE: Criamos uma versão "sem acento" das stopwords também
-# para garantir que 'não' (com acento) remova 'nao' (sem acento) do texto
 stopwords_normalizadas = set([remover_acentos(w) for w in stopwords_pt])
 
 
@@ -98,7 +85,22 @@ hide_st_style = f"""
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-st.title("🚀 Orgulho de fazer parte | Nosso Legado em 2025")
+# --- LAYOUT DE TOPO COM LOGO ---
+col_logo, col_titulo = st.columns([1, 5]) # Cria 2 colunas: uma estreita pra logo, uma larga pro título
+
+with col_logo:
+    # O try/except evita erro se a imagem não estiver no github ainda
+    try:
+        # width controla a largura em pixels. Ajuste conforme necessário.
+        st.image(NOME_ARQUIVO_LOGO, width=150) 
+    except:
+        st.write("") # Se não achar a imagem, deixa vazio
+
+with col_titulo:
+    # O título desce um pouco para alinhar com a imagem se precisar usando padding no CSS, 
+    # mas o padrão costuma ficar bom.
+    st.title("🚀 Orgulho de fazer parte | Nosso Legado em 2025")
+
 st.markdown(f"---") 
 
 # --- FUNÇÕES ---
@@ -119,49 +121,31 @@ def buscar_dados():
         st.warning("Conectando à planilha...") 
         return pd.DataFrame()
 
-# --- NOVA LÓGICA INTELIGENTE (COM SUBTRAÇÃO E SEM ACENTOS) ---
+# --- CÁLCULO DE FREQUÊNCIAS ---
 def calcular_frequencias(lista_textos):
-    """
-    1. Remove acentos de todo o texto recebido.
-    2. Conta unigramas e bigrams.
-    3. Aplica a subtração de contagem (bigrama rouba de unigrama).
-    """
-    
-    # 1. Normaliza todo o texto de entrada (remove acentos)
     textos_limpos = [remover_acentos(t) for t in lista_textos]
-    
-    # Passamos as stopwords também normalizadas
     cv = CountVectorizer(ngram_range=(1, 2), stop_words=list(stopwords_normalizadas))
     
     try:
-        # Cria a matriz
         X = cv.fit_transform(textos_limpos)
         sum_words = X.sum(axis=0) 
-        
-        # Cria dicionário inicial com TUDO misturado
         freqs_geral = {word: sum_words[0, idx] for word, idx in cv.vocabulary_.items()}
         
-        # Separa em dois dicionários: Frases (Bigramas) e Palavras Soltas (Unigramas)
         bigramas = {k: v for k, v in freqs_geral.items() if " " in k}
         unigramas = {k: v for k, v in freqs_geral.items() if " " not in k}
         
-        # A Lógica de Subtração
         for frase, count in bigramas.items():
             palavras = frase.split(" ") 
-            
             for p in palavras:
                 if p in unigramas:
                     unigramas[p] -= count
         
-        # Reconstrói o dicionário final
         dicionario_final = bigramas.copy() 
-        
         for palavra, count in unigramas.items():
             if count > 0: 
                 dicionario_final[palavra] = count
                 
         return dicionario_final
-    
     except ValueError:
         return {}
 
@@ -194,7 +178,7 @@ def gerar_figura_nuvem_com_borda(frequencias_dict, cor_mapa, cor_borda):
     plt.tight_layout(pad=1.5) 
     return fig
 
-# --- CONTAINER PRINCIPAL (LOOP) ---
+# --- CONTAINER PRINCIPAL ---
 placeholder = st.empty()
 
 while True:
@@ -209,34 +193,24 @@ while True:
                 if i < len(colunas_streamlit):
                     with colunas_streamlit[i]:
                         st.subheader(TITULOS_VISUAIS[i])
-
                         if nome_coluna_sheet in df.columns:
                             textos_lista = df[nome_coluna_sheet].dropna().astype(str).tolist()
-                            
                             if len(textos_lista) > 0:
                                 try:
                                     freq_dict = calcular_frequencias(textos_lista)
-                                    
                                     if freq_dict:
-                                        fig = gerar_figura_nuvem_com_borda(
-                                            freq_dict,
-                                            NOVAS_CORES[i], 
-                                            COLOR_NAVY      
-                                        )
+                                        fig = gerar_figura_nuvem_com_borda(freq_dict, NOVAS_CORES[i], COLOR_NAVY)
                                         st.pyplot(fig, use_container_width=True)
                                         plt.close(fig)
                                         st.markdown(f"<p style='color:gray; font-size:0.8em;'>{len(textos_lista)} respostas</p>", unsafe_allow_html=True)
                                     else:
                                          st.info("Insira palavras significativas.")
-                                
                                 except Exception as e:
                                      st.error(f"Erro ao gerar: {e}")
-
                             else:
                                 st.info("Aguardando primeiras respostas...")
                         else:
                             st.warning(f"Coluna '{TITULOS_VISUAIS[i]}' pendente.")
-
         else:
             st.info("Aguardando conexão com a planilha ou a planilha está vazia...")
 

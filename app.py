@@ -83,7 +83,7 @@ hide_st_style = f"""
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-st.title("🚀 Nosso Legado em 2025")
+st.title("🚀 Orgulho de fazer parte | Nosso Legado em 2025")
 st.markdown(f"---") # Linha separadora
 
 # --- FUNÇÕES ---

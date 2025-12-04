@@ -93,19 +93,19 @@ hide_st_style = f"""
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-# --- LAYOUT DE TOPO COM LOGO (AJUSTADO PARA SER MAIOR) ---
-# [2, 5] dá mais espaço horizontal para a coluna da esquerda (logo)
-col_logo, col_titulo = st.columns([2, 5]) 
+# --- LAYOUT DE TOPO CORRIGIDO (PARA NÃO CORTAR LOGO) ---
+# Usamos [1.5, 4.5] para dar um espaço generoso à esquerda
+col_logo, col_titulo = st.columns([1.5, 4.5]) 
 
 with col_logo:
     try:
-        # width=300 aumenta o tamanho da imagem. Se precisar mais, use 400.
-        st.image(NOME_ARQUIVO_LOGO, width=300) 
+        # use_container_width=True faz a imagem ocupar 100% da coluna sem cortar
+        st.image(NOME_ARQUIVO_LOGO, use_container_width=True) 
     except:
-        st.write("") # Fica vazio se não achar a imagem
+        st.write("") 
 
 with col_titulo:
-    # Espaços vazios para alinhar o texto verticalmente com o centro da logo
+    # Espaços para alinhar o texto verticalmente com a imagem
     st.write("") 
     st.write("") 
     st.title("🚀 Orgulho de fazer parte | Nosso Legado em 2025")

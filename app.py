@@ -88,9 +88,16 @@ st.markdown(f"---") # Linha separadora
 
 # --- FUNÇÕES ---
 def conectar_gsheets():
-    # Lembre-se que o arquivo credentials.json deve estar na mesma pasta
+    # Define o escopo de autorização
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+    
+    # EM VEZ DE LER O ARQUIVO, LEMOS OS SEGREDOS DO STREAMLIT
+    # st.secrets funciona como um dicionário seguro
+    creds_dict = st.secrets["gcp_service_account"]
+    
+    # Usamos o método from_json_keyfile_dict (note o _dict no final)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    
     client = gspread.authorize(creds)
     return client
 

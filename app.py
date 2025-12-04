@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.colors import LinearSegmentedColormap
 import time
+import unicodedata # <--- NOVO IMPORT PARA LIDAR COM ACENTOS
 
 # --- IMPORT NECESSÁRIO PARA A LÓGICA DE BIGRAMAS ---
 from sklearn.feature_extraction.text import CountVectorizer
@@ -30,6 +31,21 @@ TITULOS_VISUAIS = [
 
 TEMPO_REFRESH = 10
 
+# --- FUNÇÃO HELPER PARA REMOVER ACENTOS ---
+def remover_acentos(texto):
+    """
+    Transforma 'Relatório' em 'Relatorio', 'Ações' em 'Acoes', etc.
+    Isso garante que palavras com e sem acento sejam contadas juntas.
+    """
+    if not isinstance(texto, str):
+        return str(texto)
+    
+    # Normaliza para decompor caracteres (ex: 'á' vira 'a' + '´')
+    nfkd_form = unicodedata.normalize('NFKD', texto)
+    # Filtra apenas os caracteres que não são marcas de acentuação
+    texto_sem_acento = "".join([c for c in nfkd_form if not unicodedata.category(c) == 'Mn'])
+    return texto_sem_acento.lower()
+
 # --- CONFIGURAÇÃO DE STOPWORDS (CONECTIVOS A IGNORAR) ---
 stopwords_pt = set(STOPWORDS)
 lista_extra = [
@@ -43,6 +59,10 @@ lista_extra = [
     "teu", "tua", "teus", "tuas", "nosso", "nossa", "nossos", "nossas", "ok", "foi"
 ]
 stopwords_pt.update(lista_extra)
+
+# IMPORTANTE: Criamos uma versão "sem acento" das stopwords também
+# para garantir que 'não' (com acento) remova 'nao' (sem acento) do texto
+stopwords_normalizadas = set([remover_acentos(w) for w in stopwords_pt])
 
 
 # --- CORES PERSONALIZADAS ---
@@ -99,55 +119,53 @@ def buscar_dados():
         st.warning("Conectando à planilha...") 
         return pd.DataFrame()
 
-# --- NOVA LÓGICA INTELIGENTE (COM SUBTRAÇÃO) ---
+# --- NOVA LÓGICA INTELIGENTE (COM SUBTRAÇÃO E SEM ACENTOS) ---
 def calcular_frequencias(lista_textos):
     """
-    1. Conta unigramas e bigrams.
-    2. Se um bigrama (ex: 'novos aprendizados') existe, subtrai a contagem dele
-       das palavras individuais ('novos' e 'aprendizados').
-    3. Remove palavras que ficaram com contagem <= 0 (ou seja, só existiam dentro da frase).
+    1. Remove acentos de todo o texto recebido.
+    2. Conta unigramas e bigrams.
+    3. Aplica a subtração de contagem (bigrama rouba de unigrama).
     """
-    cv = CountVectorizer(ngram_range=(1, 2), stop_words=list(stopwords_pt))
+    
+    # 1. Normaliza todo o texto de entrada (remove acentos)
+    textos_limpos = [remover_acentos(t) for t in lista_textos]
+    
+    # Passamos as stopwords também normalizadas
+    cv = CountVectorizer(ngram_range=(1, 2), stop_words=list(stopwords_normalizadas))
     
     try:
         # Cria a matriz
-        X = cv.fit_transform(lista_textos)
+        X = cv.fit_transform(textos_limpos)
         sum_words = X.sum(axis=0) 
         
-        # 1. Cria dicionário inicial com TUDO misturado (Palavras soltas e Frases)
+        # Cria dicionário inicial com TUDO misturado
         freqs_geral = {word: sum_words[0, idx] for word, idx in cv.vocabulary_.items()}
         
-        # 2. Separa em dois dicionários: Frases (Bigramas) e Palavras Soltas (Unigramas)
+        # Separa em dois dicionários: Frases (Bigramas) e Palavras Soltas (Unigramas)
         bigramas = {k: v for k, v in freqs_geral.items() if " " in k}
         unigramas = {k: v for k, v in freqs_geral.items() if " " not in k}
         
-        # 3. A Lógica de Subtração
+        # A Lógica de Subtração
         for frase, count in bigramas.items():
-            palavras = frase.split(" ") # Quebra "novos aprendizados" em ["novos", "aprendizados"]
+            palavras = frase.split(" ") 
             
             for p in palavras:
-                # Se a palavra individual existe nos unigramas, subtrai a contagem da frase
                 if p in unigramas:
                     unigramas[p] -= count
         
-        # 4. Reconstrói o dicionário final, removendo quem zerou (ou ficou negativo)
-        dicionario_final = bigramas.copy() # Começa adicionando as frases (que são prioritárias)
+        # Reconstrói o dicionário final
+        dicionario_final = bigramas.copy() 
         
         for palavra, count in unigramas.items():
-            if count > 0: # Só adiciona a palavra solta se ela "sobrou" depois da subtração
+            if count > 0: 
                 dicionario_final[palavra] = count
                 
         return dicionario_final
     
     except ValueError:
-        # Retorna vazio se der erro (ex: só tem stopwords)
         return {}
 
 def gerar_figura_nuvem_com_borda(frequencias_dict, cor_mapa, cor_borda):
-    """
-    Agora recebe um Dicionário de Frequências em vez de texto cru.
-    """
-    # 1. Gera a nuvem de palavras A PARTIR DAS FREQUÊNCIAS
     wordcloud = WordCloud(
         width=800,
         height=600,
@@ -155,18 +173,14 @@ def gerar_figura_nuvem_com_borda(frequencias_dict, cor_mapa, cor_borda):
         colormap=cor_mapa,        
         min_font_size=12,
         max_words=50,             
-        # stopwords não precisa aqui, pois já limpamos no CountVectorizer
         random_state=42,          
-        collocations=False        # False, pois já calculamos as frases manualmente
+        collocations=False
     ).generate_from_frequencies(frequencias_dict) 
 
-    # 2. Configura a figura do Matplotlib
     fig, ax = plt.subplots(figsize=(8, 6), facecolor='none')
-    
     ax.imshow(wordcloud, interpolation='bilinear')
     ax.axis("off")
 
-    # 3. Borda
     fancy_box = mpatches.FancyBboxPatch(
         (0, 0), 1, 1,                                      
         boxstyle="round,pad=0.05,rounding_size=0.3", 
@@ -177,7 +191,6 @@ def gerar_figura_nuvem_com_borda(frequencias_dict, cor_mapa, cor_borda):
         clip_on=False                                      
     )
     ax.add_patch(fancy_box)
-
     plt.tight_layout(pad=1.5) 
     return fig
 
@@ -198,17 +211,13 @@ while True:
                         st.subheader(TITULOS_VISUAIS[i])
 
                         if nome_coluna_sheet in df.columns:
-                            # Pega a lista de textos crua
                             textos_lista = df[nome_coluna_sheet].dropna().astype(str).tolist()
                             
-                            # Verifica se tem conteúdo
                             if len(textos_lista) > 0:
                                 try:
-                                    # 1. CALCULA FREQUÊNCIAS (COM A NOVA LÓGICA DE SUBTRAÇÃO)
                                     freq_dict = calcular_frequencias(textos_lista)
                                     
                                     if freq_dict:
-                                        # 2. GERA NUVEM COM BASE NO DICIONÁRIO LIMPO
                                         fig = gerar_figura_nuvem_com_borda(
                                             freq_dict,
                                             NOVAS_CORES[i], 

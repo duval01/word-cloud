@@ -12,7 +12,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 
 # --- CONFIGURAÇÕES ---
 NOME_PLANILHA = "Respostas Conecta Sede"
-NOME_ARQUIVO_LOGO = "VERSÃO VERTICAL Colorida negativa (2).png" # <--- O arquivo deve estar no GitHub com esse nome exato
+NOME_ARQUIVO_LOGO = "VERSÃO VERTICAL 1 cor positiva (2).png" # <--- O arquivo deve estar no GitHub com esse nome exato
 
 # LISTA com os nomes exatos das 3 colunas (Cabeçalhos)
 COLUNAS_PERGUNTAS = [

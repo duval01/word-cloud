@@ -8,13 +8,16 @@ import matplotlib.patches as mpatches
 from matplotlib.colors import LinearSegmentedColormap
 import time
 
+# --- NOVO IMPORT NECESSÁRIO PARA A LÓGICA DE BIGRAMAS ---
+from sklearn.feature_extraction.text import CountVectorizer
+
 # --- CONFIGURAÇÕES ---
 NOME_PLANILHA = "Formulário sem título (respostas)"
 
 # LISTA com os nomes exatos das 3 colunas (Cabeçalhos)
 COLUNAS_PERGUNTAS = [
     "De quais projetos/resultados da minha equipe tenho orgulho?",   # Coluna 1
-    "O quê de bom aconteceu na Sede/Desenvolvimento Econômico que eu me orgulho?",      # Coluna 2
+    "O quê de bom aconteceu na Sede/Desenvolvimento Econômico que eu me orgulho?",       # Coluna 2
     "Do quê eu me orgulho em mim como profissional em 2025?"          # Coluna 3
 ]
 
@@ -28,7 +31,6 @@ TITULOS_VISUAIS = [
 TEMPO_REFRESH = 10
 
 # --- CONFIGURAÇÃO DE STOPWORDS (CONECTIVOS A IGNORAR) ---
-# Isso impede que palavras como "de", "que", "para" fiquem gigantes na nuvem
 stopwords_pt = set(STOPWORDS)
 lista_extra = [
     "de", "a", "o", "que", "e", "do", "da", "em", "um", "para", "é", "com", "não", "uma", "os", "no", 
@@ -43,39 +45,32 @@ lista_extra = [
 stopwords_pt.update(lista_extra)
 
 
-# --- CORES PERSONALIZADAS (Baseadas no print CONECTA SEDE) ---
-# Azul Marinho do cabeçalho e Dourado do logo
+# --- CORES PERSONALIZADAS ---
 COLOR_NAVY = "#1F3C73"
 COLOR_GOLD = "#F2C94C"
 COLOR_WHITE = "#FFFFFF"
 
-# Função para criar mapas de cores (colormaps) personalizados
 def criar_colormap_personalizado(nome, lista_cores):
     return LinearSegmentedColormap.from_list(nome, lista_cores, N=256)
 
-# Criando 3 variações de paletas dentro do tema
 cmap_navy_gold = criar_colormap_personalizado("NavyGold", [COLOR_NAVY, "#4a6fa5", COLOR_GOLD])
 cmap_navy_only = criar_colormap_personalizado("NavyOnly", ["#0d1a33", COLOR_NAVY, "#4a6fa5"])
 cmap_gold_only = criar_colormap_personalizado("GoldOnly", ["#997a00", COLOR_GOLD, "#ffe082"])
 
-# Lista com as novas paletas
 NOVAS_CORES = [cmap_navy_gold, cmap_navy_only, cmap_gold_only]
 
 
 # --- LAYOUT E ESTILO ---
 st.set_page_config(page_title="Dashboard Ao Vivo", layout="wide")
 
-# CSS para esconder menu, rodapé e ajustar fundo se necessário
 hide_st_style = f"""
             <style>
             #MainMenu {{visibility: hidden;}}
             footer {{visibility: hidden;}}
             header {{visibility: hidden;}}
-            /* Ajuste opcional para o fundo geral da página combinar com o slide */
             .stApp {{
                 background-color: {COLOR_WHITE};
             }}
-            /* Ajuste da cor dos títulos para o azul marinho */
             h1, h2, h3 {{
                 color: {COLOR_NAVY} !important;
             }}
@@ -84,20 +79,13 @@ hide_st_style = f"""
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
 st.title("🚀 Orgulho de fazer parte | Nosso Legado em 2025")
-st.markdown(f"---") # Linha separadora
+st.markdown(f"---") 
 
 # --- FUNÇÕES ---
 def conectar_gsheets():
-    # Define o escopo de autorização
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    
-    # EM VEZ DE LER O ARQUIVO, LEMOS OS SEGREDOS DO STREAMLIT
-    # st.secrets funciona como um dicionário seguro
     creds_dict = st.secrets["gcp_service_account"]
-    
-    # Usamos o método from_json_keyfile_dict (note o _dict no final)
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    
     client = gspread.authorize(creds)
     return client
 
@@ -108,48 +96,72 @@ def buscar_dados():
         data = sheet.get_all_records()
         return pd.DataFrame(data)
     except Exception as e:
-        # st.error(f"Erro de conexão: {e}") # Escondendo erro para não sujar a tela de apresentação
-        st.warning("Conectando à planilha...") # Mensagem mais suave
+        st.warning("Conectando à planilha...") 
         return pd.DataFrame()
 
-def gerar_figura_nuvem_com_borda(texto, cor_mapa, cor_borda):
-    # 1. Gera a nuvem de palavras
+# --- NOVA LÓGICA: GERAR DICIONÁRIO DE FREQUÊNCIA ---
+def calcular_frequencias(lista_textos):
+    """
+    Recebe uma lista de frases e retorna um dicionário {palavra: contagem},
+    considerando unigramas e bigramas (ex: 'novos aprendizados').
+    """
+    # ngram_range=(1, 2) -> Pega palavras sozinhas E pares de palavras
+    cv = CountVectorizer(ngram_range=(1, 2), stop_words=list(stopwords_pt))
+    
+    try:
+        # Cria a matriz de contagem (Fit e Transform)
+        X = cv.fit_transform(lista_textos)
+        
+        # Soma as colunas da matriz (total de vezes que cada termo apareceu)
+        sum_words = X.sum(axis=0) 
+        
+        # Cria lista de tuplas [(palavra, freq), ...]
+        words_freq = [(word, sum_words[0, idx]) for word, idx in cv.vocabulary_.items()]
+        
+        # Ordena e transforma em dicionário
+        words_freq = sorted(words_freq, key = lambda x: x[1], reverse=True)
+        return dict(words_freq)
+    
+    except ValueError:
+        # Acontece se o vocabulário ficar vazio (só tem stopwords)
+        return {}
+
+def gerar_figura_nuvem_com_borda(frequencias_dict, cor_mapa, cor_borda):
+    """
+    Agora recebe um Dicionário de Frequências em vez de texto cru.
+    """
+    # 1. Gera a nuvem de palavras A PARTIR DAS FREQUÊNCIAS
     wordcloud = WordCloud(
         width=800,
         height=600,
-        background_color='white', # Fundo branco dentro da nuvem
-        colormap=cor_mapa,        # Usa a nossa paleta personalizada
+        background_color='white', 
+        colormap=cor_mapa,        
         min_font_size=12,
-        max_words=50,             # CORREÇÃO: Reduzido de 150 para 50 para aumentar o tamanho das palavras
-        stopwords=stopwords_pt,   # CORREÇÃO: Adicionada lista de stopwords
-        random_state=42,          # Garante consistência das cores
-        collocations=False        # Evita duplicar frases (opcional, mas ajuda na limpeza)
-    ).generate(texto)
+        max_words=50,             
+        # stopwords não precisa aqui, pois já limpamos no CountVectorizer, mas mal não faz
+        random_state=42,          
+        collocations=False        # Importante: False porque nós já calculamos as collocations (bigramas) manualmente
+    ).generate_from_frequencies(frequencias_dict) # <--- MUDANÇA CRUCIAL AQUI
 
     # 2. Configura a figura do Matplotlib
-    # facecolor='none' deixa o fundo da figura transparente para não criar uma caixa branca extra
     fig, ax = plt.subplots(figsize=(8, 6), facecolor='none')
     
-    # Mostra a imagem da nuvem
     ax.imshow(wordcloud, interpolation='bilinear')
-
-    # Desliga os eixos padrões (linhas retas e números)
     ax.axis("off")
 
-    # 3. ADICIONA A BORDA ARREDONDADA (Formato de "Nuvem"/Balão)
-    # Usamos um FancyBboxPatch para criar uma borda muito arredondada
+    # 3. Borda
     fancy_box = mpatches.FancyBboxPatch(
-        (0, 0), 1, 1,                                  # Coordenadas relativas (cobre todo o ax)
-        boxstyle="round,pad=0.05,rounding_size=0.3", # Estilo arredondado
-        linewidth=4,                                   # Espessura da borda (mais grossa)
-        edgecolor=cor_borda,                           # Cor da borda (Azul Marinho)
-        facecolor='none',                              # Sem preenchimento para ver as palavras
-        transform=ax.transAxes,                        # Importante para alinhar ao tamanho do gráfico
-        clip_on=False                                  # Permite que a borda grossa saia um pouco da área
+        (0, 0), 1, 1,                                      
+        boxstyle="round,pad=0.05,rounding_size=0.3", 
+        linewidth=4,                                       
+        edgecolor=cor_borda,                               
+        facecolor='none',                                  
+        transform=ax.transAxes,                            
+        clip_on=False                                      
     )
     ax.add_patch(fancy_box)
 
-    plt.tight_layout(pad=1.5) # Garante espaço para a borda grossa não cortar
+    plt.tight_layout(pad=1.5) 
     return fig
 
 # --- CONTAINER PRINCIPAL (LOOP) ---
@@ -157,58 +169,49 @@ placeholder = st.empty()
 
 while True:
     with placeholder.container():
-        # Tenta buscar dados. Se falhar, df virá vazio.
         df = buscar_dados()
 
         if not df.empty:
-            # Cria 3 colunas no Streamlit
             col1, col2, col3 = st.columns(3)
             colunas_streamlit = [col1, col2, col3]
 
-            # Loop para gerar as 3 nuvens
             for i, nome_coluna_sheet in enumerate(COLUNAS_PERGUNTAS):
-                # Garante que não vamos tentar acessar uma coluna que não existe no layout
                 if i < len(colunas_streamlit):
                     with colunas_streamlit[i]:
-                        # Títulos com a cor azul marinho (definido no CSS lá em cima)
                         st.subheader(TITULOS_VISUAIS[i])
 
                         if nome_coluna_sheet in df.columns:
-                            # Pega o texto, remove vazios e converte para string
-                            textos = df[nome_coluna_sheet].dropna().astype(str).tolist()
+                            # Pega a lista de textos crua (sem dar join ainda)
+                            textos_lista = df[nome_coluna_sheet].dropna().astype(str).tolist()
                             
-                            # CORREÇÃO: Adicionado .lower() para normalizar (Teste == teste)
-                            texto_completo = " ".join(textos).lower()
-
-                            # Verifica se tem texto suficiente (pelo menos algumas letras)
-                            if len(texto_completo.strip()) > 5:
+                            # Verifica se tem conteúdo
+                            if len(textos_lista) > 0:
                                 try:
-                                    # Chama a função de gerar figura
-                                    fig = gerar_figura_nuvem_com_borda(
-                                        texto_completo,
-                                        NOVAS_CORES[i], # Usa as novas paletas
-                                        COLOR_NAVY      # Usa o azul marinho para a borda
-                                    )
-                                    # use_container_width=True ajuda a ajustar a imagem à coluna
-                                    st.pyplot(fig, use_container_width=True)
-                                    plt.close(fig)
-                                    # Caption com cor mais discreta
-                                    st.markdown(f"<p style='color:gray; font-size:0.8em;'>{len(textos)} respostas</p>", unsafe_allow_html=True)
-                                except ValueError:
-                                    st.info("Poucas palavras para gerar nuvem.")
+                                    # 1. CALCULA FREQUÊNCIAS (COM BIGRAMAS)
+                                    freq_dict = calcular_frequencias(textos_lista)
+                                    
+                                    if freq_dict:
+                                        # 2. GERA NUVEM COM BASE NO DICIONÁRIO
+                                        fig = gerar_figura_nuvem_com_borda(
+                                            freq_dict,
+                                            NOVAS_CORES[i], 
+                                            COLOR_NAVY      
+                                        )
+                                        st.pyplot(fig, use_container_width=True)
+                                        plt.close(fig)
+                                        st.markdown(f"<p style='color:gray; font-size:0.8em;'>{len(textos_lista)} respostas</p>", unsafe_allow_html=True)
+                                    else:
+                                         st.info("Insira palavras significativas.")
+                                
                                 except Exception as e:
-                                     st.error(f"Erro ao gerar nuvem: {e}")
+                                     st.error(f"Erro ao gerar: {e}")
 
                             else:
                                 st.info("Aguardando primeiras respostas...")
                         else:
-                            # Mensagem de erro mais discreta em produção
                             st.warning(f"Coluna '{TITULOS_VISUAIS[i]}' pendente.")
 
         else:
-            # Se não conseguiu dados, mostra uma mensagem de espera.
-            # O loop vai tentar de novo em breve.
             st.info("Aguardando conexão com a planilha ou a planilha está vazia...")
 
-    # Pausa antes do próximo refresh
     time.sleep(TEMPO_REFRESH)

@@ -84,25 +84,31 @@ hide_st_style = f"""
             footer {{visibility: hidden;}}
             header {{visibility: hidden;}}
             
-            /* 1. Reduz o espaço lá em cima da página (o padrão é uns 5rem) */
+            /* 1. Tira quase todo o espaço do topo da página */
             .block-container {{
-                padding-top: 1rem; 
-                padding-bottom: 0rem;
+                padding-top: 0.5rem !important; 
+                padding-bottom: 0rem !important;
             }}
 
-            /* 2. Reduz a margem inferior do Título Principal (h1) */
+            /* 2. Puxa os gráficos para cima (Colando no título) */
             h1 {{
-                margin-bottom: -1rem; /* Puxa o conteúdo de baixo para cima */
-                padding-bottom: 0rem;
+                padding-top: 0rem !important;
+                padding-bottom: 0rem !important;
+                margin-bottom: -2.5rem !important; /* Aumente esse negativo se quiser subir mais */
             }}
 
-            /* 3. Ajusta a linha horizontal (---) para ocupar menos espaço vertical */
+            /* 3. Compacta a linha horizontal (---) se ela ainda existir */
             hr {{
-                margin-top: 0.5rem;
-                margin-bottom: 0.5rem;
+                margin-top: 0.5rem !important;
+                margin-bottom: 0.5rem !important;
             }}
-            
-            /* Ajustes de cores que já fizemos antes */
+
+            /* 4. Remove o espaço padrão entre blocos do Streamlit */
+            [data-testid="stVerticalBlock"] {{
+                gap: 0rem !important;
+            }}
+
+            /* Cores e fundo */
             .stApp {{
                 background-color: {COLOR_WHITE};
             }}

@@ -119,9 +119,9 @@ hide_st_style = f"""
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-# --- LAYOUT DE TOPO CORRIGIDO (PARA NÃO CORTAR LOGO) ---
-# Usamos [1.5, 4.5] para dar um espaço generoso à esquerda
-col_logo, col_titulo = st.columns([1.5, 4.5]) 
+# --- LAYOUT DE TOPO CORRIGIDO ---
+# Adicionado vertical_alignment="center" para alinhar logo e texto
+col_logo, col_titulo = st.columns([1.5, 4.5], vertical_alignment="center") 
 
 with col_logo:
     try:
@@ -131,9 +131,7 @@ with col_logo:
         st.write("") 
 
 with col_titulo:
-    # Espaços para alinhar o texto verticalmente com a imagem
-    st.write("") 
-    st.write("") 
+    # Removido st.write("") pois o vertical_alignment="center" já faz o trabalho
     st.title("🚀 Orgulho de fazer parte | Nosso Legado em 2025")
 
 st.markdown(f"---") 
@@ -222,13 +220,13 @@ def gerar_figura_nuvem_com_borda(frequencias_dict, cor_mapa, cor_borda):
 
     # Borda Arredondada
     fancy_box = mpatches.FancyBboxPatch(
-        (0, 0), 1, 1,                                      
+        (0, 0), 1, 1,                               
         boxstyle="round,pad=0.05,rounding_size=0.3", 
-        linewidth=4,                                       
-        edgecolor=cor_borda,                               
-        facecolor='none',                                  
-        transform=ax.transAxes,                            
-        clip_on=False                                      
+        linewidth=4,                                
+        edgecolor=cor_borda,                        
+        facecolor='none',                           
+        transform=ax.transAxes,                     
+        clip_on=False                               
     )
     ax.add_patch(fancy_box)
     plt.tight_layout(pad=1.5) 

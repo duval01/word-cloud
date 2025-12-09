@@ -83,6 +83,26 @@ hide_st_style = f"""
             #MainMenu {{visibility: hidden;}}
             footer {{visibility: hidden;}}
             header {{visibility: hidden;}}
+            
+            /* 1. Reduz o espaço lá em cima da página (o padrão é uns 5rem) */
+            .block-container {{
+                padding-top: 1rem; 
+                padding-bottom: 0rem;
+            }}
+
+            /* 2. Reduz a margem inferior do Título Principal (h1) */
+            h1 {{
+                margin-bottom: -1rem; /* Puxa o conteúdo de baixo para cima */
+                padding-bottom: 0rem;
+            }}
+
+            /* 3. Ajusta a linha horizontal (---) para ocupar menos espaço vertical */
+            hr {{
+                margin-top: 0.5rem;
+                margin-bottom: 0.5rem;
+            }}
+            
+            /* Ajustes de cores que já fizemos antes */
             .stApp {{
                 background-color: {COLOR_WHITE};
             }}

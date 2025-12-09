@@ -78,6 +78,7 @@ NOVAS_CORES = [cmap_navy_gold, cmap_navy_only, cmap_gold_only]
 # --- LAYOUT E ESTILO ---
 st.set_page_config(page_title="Dashboard Ao Vivo", layout="wide")
 
+# --- CSS CORRIGIDO (REMOVIDA A MARGEM NEGATIVA DO H1) ---
 hide_st_style = f"""
             <style>
             #MainMenu {{visibility: hidden;}}
@@ -90,11 +91,11 @@ hide_st_style = f"""
                 padding-bottom: 0rem !important;
             }}
 
-            /* 2. Puxa os gráficos para cima (Colando no título) */
+            /* 2. Ajuste do título H1 */
             h1 {{
                 padding-top: 0rem !important;
                 padding-bottom: 0rem !important;
-                margin-bottom: -2.5rem !important; /* Aumente esse negativo se quiser subir mais */
+                /* A linha de margin-bottom negativa foi removida aqui para tirar a sombra */
             }}
 
             /* 3. Compacta a linha horizontal (---) se ela ainda existir */
@@ -119,8 +120,8 @@ hide_st_style = f"""
             """
 st.markdown(hide_st_style, unsafe_allow_html=True)
 
-# --- LAYOUT DE TOPO CORRIGIDO ---
-# Adicionado vertical_alignment="center" para alinhar logo e texto
+# --- LAYOUT DE TOPO ---
+# Adicionado vertical_alignment="center" para alinhar logo e texto verticalmente
 col_logo, col_titulo = st.columns([1.5, 4.5], vertical_alignment="center") 
 
 with col_logo:
@@ -131,7 +132,6 @@ with col_logo:
         st.write("") 
 
 with col_titulo:
-    # Removido st.write("") pois o vertical_alignment="center" já faz o trabalho
     st.title("🚀 Orgulho de fazer parte | Nosso Legado em 2025")
 
 st.markdown(f"---") 
